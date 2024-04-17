@@ -1,0 +1,76 @@
+#include "M5StickCPlus2.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include "arduino_secrets.h"
+
+// WiFi credentials: Replace with your actual WiFi credentials
+const char* ssid = SECRET_SSID; // Load SSID from secrets file
+const char* password = SECRET_PWD; // Load password from secrets file
+
+void setup() {
+  Serial.begin(115200); // Start serial communication for debugging
+  M5.begin(); // Initialize the M5StickC Plus hardware
+  M5.Lcd.setRotation(3); // Set the screen rotation to landscape mode
+  M5.Lcd.setTextSize(2); // Set the font size for text display
+  M5.Lcd.fillScreen(BLACK); // Clear the screen and set the background to black
+
+  WiFi.begin(ssid, password);
+  M5.Lcd.setCursor(0, 10);
+  M5.Lcd.println("Connecting to WiFi..");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    M5.Lcd.print(".");
+  }
+
+  M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setCursor(0, 10);
+  M5.Lcd.println("Connected!");
+  delay(1000);
+}
+
+void loop() {
+  M5.update(); // Update button states and other hardware components
+
+  if (M5.BtnA.wasPressed()) {
+    Serial.println("Button A was pressed"); // Debugging output
+    fetchAndDisplayJoke();
+    delay(200); // Debounce delay
+  }
+}
+
+void fetchAndDisplayJoke() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin("https://api.chucknorris.io/jokes/random");
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      String payload = http.getString();
+      int jokeStart = payload.indexOf("value\":\"") + 8;
+      int jokeEnd = payload.indexOf("\"", jokeStart);
+      String joke = payload.substring(jokeStart, jokeEnd);
+
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 10);
+      M5.Lcd.println(joke);
+    } else {
+      showError();
+    }
+    http.end();
+  } else {
+    showDisconnected();
+  }
+}
+
+void showError() {
+  M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setCursor(0, 10);
+  M5.Lcd.println("Failed to retrieve joke");
+}
+
+void showDisconnected() {
+  M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setCursor(0, 10);
+  M5.Lcd.println("WiFi Disconnected");
+}
